@@ -93,7 +93,7 @@ class BitInvestor(nn.Module):
             if rebal_msk.item() > 0.:
                 weights = wscores / wscores.sum()
             else:
-                weights = torch.zeros_like(wscores)
+                weights = torch.zeros_like(wscores).detach()
         else:
             self.eval()
             with torch.no_grad():
