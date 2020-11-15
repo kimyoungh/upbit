@@ -203,14 +203,14 @@ class BitAgent:
             if episodes <= 0:
                 break
 
+            env = deepcopy(self.env)
+
+            beg_pos = np.random.randint(self.env.min_beg,
+                                        self.env.price_data.shape[0] - \
+                                        (self.tlength - 1), 1).item()
+
             for i in range(iters):
                 t_pos = 0
-
-                env = deepcopy(self.env)
-
-                beg_pos = np.random.randint(self.env.min_beg,
-                                            self.env.price_data.shape[0] - \
-                                            (self.tlength - 1), 1).item()
 
                 obs, done = env.reset(beg_pos=beg_pos)
 
