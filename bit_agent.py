@@ -109,7 +109,7 @@ class BitAgent:
         scheduler = optim.lr_scheduler.StepLR(self.optimizer, 10000.0,
                                               gamma=0.99)
 
-        #mp.set_start_method('spawn', force=True)
+        mp.set_start_method('spawn', force=False)
         self.investor.share_memory()
 
         train_queue = mp.Queue(maxsize=self.process_count)
