@@ -159,14 +159,14 @@ class BitAgent:
                 if len(episode_info) > 1:
                     timings_queue.put(episodes)
 
-                    writer.add_scalar('Reward(Avg)', episode_check_queue[3], ep_t)
-                    writer.add_scalar('Cum_Ret', episode_check_queue[4], ep_t)
-                    writer.add_scalar('Mu', episode_check_queue[5], ep_t)
-                    writer.add_scalar('Sig', episode_check_queue[6], ep_t)
-                    writer.add_scalar('IR', episode_check_queue[7], ep_t)
+                    writer.add_scalar('Reward(Avg)', episode_info[3], ep_t)
+                    writer.add_scalar('Cum_Ret', episode_info[4], ep_t)
+                    writer.add_scalar('Mu', episode_info[5], ep_t)
+                    writer.add_scalar('Sig', episode_info[6], ep_t)
+                    writer.add_scalar('IR', episode_info[7], ep_t)
 
                     ep_t += 1
-                    print(ep_t, episode_check_queue[2], episode_check_queue[3])
+                    print(ep_t, episode_info[2], episode_info[3])
 
                     self.save_investor(self.model_path)
         end = datetime.datetime.now()
