@@ -166,9 +166,14 @@ class BitAgent:
                     writer.add_scalar('IR', episode_info[7], ep_t)
 
                     ep_t += 1
-                    print(ep_t, episode_info[2], episode_info[3])
+                    print(ep_t, episode_info[1], episode_info[2], episode_info[3])
 
                     self.save_investor(self.model_path)
+        for proc in data_proc_list:
+            proc.terminate()
+            proc.join()
+        data_proc_list.clear()
+
         end = datetime.datetime.now()
         print((end - start).total_seconds())
 
