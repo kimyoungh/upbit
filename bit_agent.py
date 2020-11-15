@@ -300,7 +300,7 @@ class BitAgent:
         discountd_return = self.discounted_prediction(next_weights, next_q_values,
                                                       rewards, weights_prev)
         g_return =\
-                torch.FloatTensor(discountd_return.astype(float)).to(device)
+                torch.FloatTensor(discountd_return.astype(float)).to(self.device)
 
         # Mean Q_value 계산
         weights = torch.cat(weights)
