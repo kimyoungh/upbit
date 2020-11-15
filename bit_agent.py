@@ -199,6 +199,9 @@ class BitAgent:
 
                 obs, done = env.reset(beg_pos=beg_pos)
 
+                for i, ob in enumerate(obs):
+                    obs[i] = ob.to(self.device)
+
                 rewards_seqs = []
                 rets_seqs = []
                 states, probs_list, q_values_list = [], [], []
