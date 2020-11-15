@@ -230,7 +230,7 @@ class BitAgent:
                     if actions[0, 0] > 0.5:
                         weights_prev = actions[0, 1:].view(1, -1)
                     else:
-                        weights_prev = latest_w_prev
+                        weights_prev = latest_w_prev.view(1, -1)
 
                     for j, ob in enumerate(next_obs):
                         next_obs[j] = ob.to(self.device)
