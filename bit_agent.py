@@ -156,6 +156,7 @@ class BitAgent:
                     grad_buffer = None
 
                 episode_info = episode_check_queue.get()
+                print(episode_info)
                 done = episode_info[0]
                 episodes -= done
 
@@ -188,7 +189,7 @@ class BitAgent:
             Return:
                 grads, done, reward, return
         """
-        print("simulation beginning...")
+        #print("simulation beginning...")
 
         while True:
             episodes = timings_queue.get()
@@ -197,7 +198,6 @@ class BitAgent:
                 break
 
             for i in range(iters):
-                print(i)
                 t_pos = 0
 
                 env = deepcopy(self.env)
@@ -318,7 +318,6 @@ class BitAgent:
             Investor gradient 계산 및 적재
         """
         investor.zero_grad()
-        print(rewards)
 
         discountd_return = self.discounted_prediction(next_weights, next_q_values,
                                                       rewards, weights_prev)
