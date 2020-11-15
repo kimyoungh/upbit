@@ -133,6 +133,9 @@ class BitAgent:
             grad_buffer = None
 
             while True:
+                if episodes < 0:
+                    break
+
                 train_entry = train_queue.get()
                 step_idx += 1
 
@@ -315,6 +318,7 @@ class BitAgent:
             Investor gradient 계산 및 적재
         """
         investor.zero_grad()
+        print(rewards)
 
         discountd_return = self.discounted_prediction(next_weights, next_q_values,
                                                       rewards, weights_prev)
