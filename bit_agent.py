@@ -264,7 +264,7 @@ class BitAgent:
                                 cum_ret = ((1. + rets_seqs).prod() - 1.).item()
 
                                 mu = rets_seqs.mean()
-                                sig = rets_seqs.sd()
+                                sig = rets_seqs.std()
                                 ir = mu / (sig + eps)
 
                             if (i + 1) == iters:
