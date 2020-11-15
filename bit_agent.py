@@ -227,6 +227,10 @@ class BitAgent:
                     rets_seqs.append(ret)
                     rewards_seqs.append(reward)
 
+                    latest_w_prev =\
+                        torch.FloatTensor(latest_w_prev.astype(float))
+                    latest_w_prev = latest_w_prev.to(self.device)
+
                     if actions[0, 0] > 0.5:
                         weights_prev = actions[0, 1:].view(1, -1)
                     else:
