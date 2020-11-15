@@ -217,10 +217,8 @@ class BitAgent:
                                                     init=init, train=True)
 
                     next_obs, reward, ret, latest_w_prev, done =\
-                        env.step(actions.to('cpu'), weights_prev.to('cpu'))
-
-                    latest_w_prev = latest_w_prev.to(self.device)
-                    print(latest_w_prev)
+                        env.step(actions.to('cpu'),
+                                 weights_prev.view(-1).to('cpu'))
 
                     states.append(obs)
                     probs_list.append(actions)
@@ -230,7 +228,7 @@ class BitAgent:
                     rewards_seqs.append(reward)
 
                     if actions[0, 0] > 0.5:
-                        weights_prev = actions[0, 1:]
+                        weights_prev = actions[0, 1:].view(1, -1)
                     else:
                         weights_prev = latest_w_prev
 
