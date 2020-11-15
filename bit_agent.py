@@ -362,7 +362,7 @@ class BitAgent:
 
         # 전체 loss & grad 계산
         loss = loss_policy_v + entropy_loss_v + loss_value_v
-        loss.backward(retain_graph=True)
+        loss.backward()
         nn_utils.clip_grad_norm_(investor.parameters(), self.clip_grad)
 
         grads = [param.grad.data.cpu().numpy() if param.grad is not None else None
