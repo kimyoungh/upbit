@@ -256,9 +256,9 @@ class BitAgent:
                             episode_check_queue.put([0])
                         else:
                             with torch.no_grad():
-                                rewards_seqs = torch.cat(rewards_seqs)
-                                rets_seqs = torch.cat(rets_seqs)
-                                reward = rewards_seqs.sum().detach().item() / \
+                                rewards_seqs = np.array(rewards_seqs)
+                                rets_seqs = torch.tensor(rets_seqs).view(-1)
+                                reward = rewards_seqs.sum() / \
                                         rewards_seqs.shape[0]
 
                                 cum_ret = ((1. + rets_seqs).prod() - 1.).item()
