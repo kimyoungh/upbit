@@ -199,8 +199,8 @@ class BitAgent:
 
                 obs, done = env.reset(beg_pos=beg_pos)
 
-                for i, ob in enumerate(obs):
-                    obs[i] = ob.to(self.device)
+                for j, ob in enumerate(obs):
+                    obs[j] = ob.to(self.device)
 
                 rewards_seqs = []
                 rets_seqs = []
@@ -217,7 +217,9 @@ class BitAgent:
                                                     init=init, train=True)
 
                     next_obs, reward, ret, latest_w_prev, done =\
-                        env.step(actions, weights_prev)
+                        env.step(actions.to('cpu'), weights_prev.to('cpu'))
+
+                    latest_w_prev = latest_w_prev.to(self.device)
 
                     states.append(obs)
                     probs_list.append(actions)
@@ -230,6 +232,9 @@ class BitAgent:
                         weights_prev = actions[0, 1:]
                     else:
                         weights_prev = latest_w_prev
+
+                    for j, ob in enumerate(next_obs):
+                        next_obs[j] = ob.to(self.device)
 
                     init = False
 
@@ -272,6 +277,8 @@ class BitAgent:
                                      env.price_data.index[beg_pos],
                                      reward, cum_ret, mu.item(), sig.item(),
                                      ir.detach().item()])
+
+                    obs = next_obs
 
     def discounted_prediction(self, next_weights, next_q_values,
                               rewards, weights_prev):
