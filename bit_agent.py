@@ -194,6 +194,7 @@ class BitAgent:
                 break
 
             for i in range(iters):
+                print(i)
                 t_pos = 0
 
                 env = deepcopy(self.env)
