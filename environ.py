@@ -86,7 +86,7 @@ class Environment:
 
         latest_w_prev = w_prev * [1. + wret, 1.]
 
-        if not init:
+        if not init and w_prev.sum() > 0.:
             latest_w_prev /= latest_w_prev.sum()
 
         self.cur_pos += 1
