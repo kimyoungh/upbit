@@ -52,6 +52,7 @@ class BitInvestor(nn.Module):
                       init=False, num=100.):
         if train:
             spike = self.spike.rsample(log_rebal.shape)
+            spike = spike.to(log_rebal.device)
             if init:
                 rebal_msk = self.sigmoid(num * (torch.exp(log_rebal) + 0.5))
             else:
@@ -59,7 +60,7 @@ class BitInvestor(nn.Module):
                         - (1. - torch.exp(log_rebal))))
         else:
             if init:
-                rebal_msk = torch.tensor(1.)
+                rebal_msk = torch.tensor(1.).to(log_rebal_device)
             else:
                 rebal_msk = torch.round(torch.exp(log_rebal))
 
