@@ -20,7 +20,7 @@ class BitInvestor(nn.Module):
     """
         Bit Investor
     """
-    def __init__(self, in_channels=7, mlength=60, moutdim=4,
+    def __init__(self, in_channels=6, mlength=60, moutdim=4,
                  hlength=24, houtdim=4,
                  dlength=250, doutdim=4):
         super(BitInvestor, self).__init__()

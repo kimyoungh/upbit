@@ -63,7 +63,7 @@ class Environment:
 
         return obs, done
 
-    def step(self, action, weights_prev):
+    def step(self, action, weights_prev, init=False):
         """
             step.
             Args:
@@ -85,7 +85,9 @@ class Environment:
         wret = self.returns.iloc[self.cur_pos]
 
         latest_w_prev = w_prev * [1. + wret, 1.]
-        latest_w_prev /= latest_w_prev.sum()
+
+        if not init:
+            latest_w_prev /= latest_w_prev.sum()
 
         self.cur_pos += 1
         ret = self.returns.iloc[self.cur_pos]
@@ -120,13 +122,14 @@ class Environment:
 
     def _calc_obs(self, eps=1e-6):
         " calculate observation "
-        start_pos = self.cur_pos - self.min_beg
-        data = self.price_data.iloc[start_pos:self.cur_pos+1].copy()
+
+        data = self.price_data
 
         # minutes
         minutes = data.iloc[self.cur_pos - 60 + 1:self.cur_pos + 1].copy()
         minutes = minutes / (minutes.max() + eps)
         minutes = torch.FloatTensor(minutes.values.astype(float))
+        minutes = minutes.unsqueeze(0).transpose(1, 2)
 
         # hours
         hours = data.iloc[self.cur_pos - 60 * 24 + 1:self.cur_pos + 1].copy()
@@ -136,6 +139,7 @@ class Environment:
         hours = hours.iloc[60 * np.arange(24) + 59]
         hours = hours / (hours.max() + eps)
         hours = torch.FloatTensor(hours.values.astype(float))
+        hours = hours.unsqueeze(0).transpose(1, 2)
 
         # days
         days = data.iloc[self.cur_pos - 60 * 24 * 250 + 1:self.cur_pos + 1].copy()
@@ -145,5 +149,6 @@ class Environment:
         days = days.iloc[60 * 24 * np.arange(250) + (60 * 24 - 1)]
         days = days / (days.max() + eps)
         days = torch.FloatTensor(days.values.astype(float))
+        days = days.unsqueeze(0).transpose(1, 2)
 
         return [minutes, hours, days]
