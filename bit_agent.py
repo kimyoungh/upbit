@@ -20,6 +20,8 @@ from tensorboardX import SummaryWriter
 from environ import Environment
 from bit_allocator import BitInvestor
 
+import pdb
+
 
 class BitAgent:
     """
@@ -161,6 +163,7 @@ class BitAgent:
                 episodes -= done
 
                 if len(episode_info) > 1:
+                    pdb.set_trace()
                     timings_queue.put(episodes)
 
                     writer.add_scalar('Reward(Avg)', episode_info[3], ep_t)
