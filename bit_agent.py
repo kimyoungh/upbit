@@ -4,6 +4,7 @@
     Created on 2020.11.07
     @author: Younghyun Kim
 """
+import pickle
 from copy import deepcopy
 import datetime
 import numpy as np
@@ -19,8 +20,6 @@ from tensorboardX import SummaryWriter
 
 from environ import Environment
 from bit_allocator import BitInvestor
-
-import pdb
 
 
 class BitAgent:
@@ -120,6 +119,7 @@ class BitAgent:
 
         ep_t = 0
         data_proc_list = []
+        train_results = []
 
         for proc_idx in range(self.process_count):
             timings_queue.put(episodes)
@@ -163,7 +163,6 @@ class BitAgent:
                 episodes -= done
 
                 if len(episode_info) > 1:
-                    pdb.set_trace()
                     timings_queue.put(episodes)
 
                     writer.add_scalar('Reward(Avg)', episode_info[3], ep_t)
@@ -174,6 +173,10 @@ class BitAgent:
 
                     ep_t += 1
                     print(ep_t, episode_info[1], episode_info[2], episode_info[3])
+                    train_results.append(episode_info)
+
+                    with open(self.logdir + "results.pkl", 'wb') as f:
+                        pickle.dump(train_results, f)
 
                     self.save_investor(self.model_path)
         for proc in data_proc_list:
