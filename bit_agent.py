@@ -220,6 +220,7 @@ class BitAgent:
                         env.step(actions.to('cpu'), weights_prev.to('cpu'))
 
                     latest_w_prev = latest_w_prev.to(self.device)
+                    print(latest_w_prev)
 
                     states.append(obs)
                     probs_list.append(actions)
