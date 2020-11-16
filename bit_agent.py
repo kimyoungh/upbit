@@ -147,7 +147,7 @@ class BitAgent:
                     for tgt_grad, grad in zip(grad_buffer, train_entry):
                         tgt_grad += grad
 
-                if step_idx % self.grad_batch == 0:
+                if step_idx % self.train_batch == 0:
                     for param, grad in zip(self.investor.parameters(),
                                            grad_buffer):
                         param.grad = torch.FloatTensor(grad).to(self.device)
@@ -262,7 +262,7 @@ class BitAgent:
                                                                   init=init,
                                                                   train=True)
 
-                    if done or t_pos == self.train_batch:
+                    if done or t_pos == self.grad_batch:
                         grads = self.accumulate_grads(investor,
                                                       probs_list[-t_pos:],
                                                       q_values_list[-t_pos:],
@@ -295,6 +295,7 @@ class BitAgent:
                                      env.price_data.index[beg_pos],
                                      reward, cum_ret, mu.item(), sig.item(),
                                      ir.detach().item()])
+                        t_pos = 0
 
                     obs = next_obs
 
