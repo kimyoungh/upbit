@@ -211,6 +211,8 @@ class BitAgent:
                                         (self.tlength - 1), 1).item()
 
             for i in range(iters):
+                episodes = timings_queue.get()
+
                 t_pos = 0
 
                 obs, done = env.reset(beg_pos=beg_pos)
