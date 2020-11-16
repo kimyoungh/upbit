@@ -164,6 +164,7 @@ class BitAgent:
 
                 if len(episode_info) > 1:
                     timings_queue.put(episodes)
+                    print(timings_queue)
 
                     writer.add_scalar('Reward(Avg)', episode_info[3], ep_t)
                     writer.add_scalar('Cum_Ret', episode_info[4], ep_t)
