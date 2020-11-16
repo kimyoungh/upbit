@@ -198,10 +198,6 @@ class BitAgent:
         #print("simulation beginning...")
 
         while True:
-            episodes = timings_queue.get()
-
-            if episodes <= 0:
-                break
 
             env = deepcopy(self.env)
 
@@ -299,6 +295,9 @@ class BitAgent:
                                      ir.detach().item()])
 
                     obs = next_obs
+
+            if episodes <= 0:
+                break
 
     def discounted_prediction(self, next_weights, next_q_values,
                               rewards, weights_prev):
