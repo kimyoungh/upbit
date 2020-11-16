@@ -158,7 +158,7 @@ class BitAgent:
                     grad_buffer = None
 
                 episode_info = episode_check_queue.get()
-                print(episode_info)
+
                 done = episode_info[0]
                 episodes -= done
 
