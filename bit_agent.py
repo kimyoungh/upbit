@@ -270,7 +270,7 @@ class BitAgent:
                                                       rewards_seqs[-t_pos:],
                                                       weights_prev)
                         train_queue.put(grads)
-
+                        t_pos = 0
                         if not done:
                             episode_check_queue.put([0])
                         else:
@@ -295,7 +295,6 @@ class BitAgent:
                                      env.price_data.index[beg_pos],
                                      reward, cum_ret, mu.item(), sig.item(),
                                      ir.detach().item()])
-                        t_pos = 0
 
                     obs = next_obs
 
