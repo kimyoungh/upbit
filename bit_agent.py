@@ -306,9 +306,9 @@ class BitAgent:
         """
         discounted_return = np.zeros_like(rewards)
 
-        if next_weights[0, 0] > 0.5:
+        if next_weights[0, 2:].sum() > 0.5:
             running_add =\
-                next_weights[:, 1:].matmul(next_q_values.transpose(0, 1))
+                next_weights[:, 2:].matmul(next_q_values.transpose(0, 1))
         else:
             running_add =\
                 weights_prev.unsqueeze(0).matmul(next_q_values.transpose(0, 1))
