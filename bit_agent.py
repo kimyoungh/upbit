@@ -226,8 +226,8 @@ class BitAgent:
                 while not done:
                     t_pos += 1
 
-                    actions, _, q_values = investor(*obs, weights_prev,
-                                                    init=init, train=True)
+                    actions, _, q_values, _ = investor(*obs, weights_prev,
+                                                       init=init, train=True)
 
                     next_obs, reward, ret, latest_w_prev, done =\
                         env.step(actions.to('cpu'),
@@ -240,8 +240,8 @@ class BitAgent:
                     rets_seqs.append(ret)
                     rewards_seqs.append(reward)
 
-                    if actions[0, 0] > 0.5:
-                        weights_prev = actions[0, 1:].view(1, -1)
+                    if actions[0, -2:].sum() > 0.5:
+                        weights_prev = actions[0, 2:].view(1, -1)
                     else:
                         latest_w_prev =\
                             torch.FloatTensor(latest_w_prev.astype(float))
@@ -255,10 +255,10 @@ class BitAgent:
                     init = False
 
                     with torch.no_grad():
-                        next_actions, _, next_q_values = investor(*next_obs,
-                                                                  weights_prev,
-                                                                  init=init,
-                                                                  train=True)
+                        next_actions, _, next_q_values, _ = investor(*next_obs,
+                                                                     weights_prev,
+                                                                     init=init,
+                                                                     train=True)
 
                     if done or t_pos == self.grad_batch:
                         grads = self.accumulate_grads(investor,

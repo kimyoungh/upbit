@@ -95,6 +95,7 @@ class BitInvestor(nn.Module):
                 weights = wscores / wscores.sum()
             else:
                 weights = torch.zeros_like(wscores).detach()
+            nweights = weights_prev * (1. - rebal_msk)
         else:
             self.eval()
             with torch.no_grad():
@@ -112,16 +113,17 @@ class BitInvestor(nn.Module):
             if rebal_msk.item() > 0.:
                 weights = wscores / wscores.sum()
             else:
-                weights = torch.zeros_like(wscores)
+                weights = torch.zeros_like(wscores).detach()
+            nweights = weights_prev * (1. - rebal_msk)
 
-                weights = weights.detach()
-                wscores = wscores.detach()
-                q_values = q_values.detach()
-                rebal_msk = rebal_msk.detach()
+            weights = weights.detach()
+            wscores = wscores.detach()
+            q_values = q_values.detach()
+            rebal_msk = rebal_msk.detach()
 
-        rweights = torch.cat((rebal_msk.unsqueeze(0), weights), dim=1)
+        rweights = torch.cat((nweights, weights), dim=1)
 
-        return rweights, wscores, q_values
+        return rweights, wscores, q_values, rebal_msk
 
 class SequenceCNN(nn.Module):
     """

@@ -92,10 +92,8 @@ class Environment:
         self.cur_pos += 1
         ret = self.returns.iloc[self.cur_pos]
 
-        rebal = acts[0, 0]
-
-        if rebal > 0.5:
-            weights = acts[0, 1:]
+        if acts[0, -2:].sum() > 0.5:
+            weights = acts[0, -2:]
             w_diff = weights - latest_w_prev
 
             if w_diff[0] > 0.:
@@ -103,13 +101,20 @@ class Environment:
             elif w_diff[0] <= 0.:
                 fee = self.selling_fee * w_diff[0]
 
-            ret = weights.dot([ret - fee, 0.])
+            ret -= fee
 
             latest_w_prev = None
         else:
-            ret = latest_w_prev.dot([ret, 0.])
+            weights = acts[0, :2]
 
-        reward = ret / self.retmax.iloc[self.cur_pos]
+        if ret > 0 and weights[0] >= weights[1]:
+            reward = 1
+        elif ret > 0 and weights[0] < weights[1]:
+            reward = -1
+        elif ret <= 0 and weights[0] >= weights[1]:
+            reward = -1
+        elif ret <= 0 and weights[0] < weights[1]:
+            reward = 1
 
         next_obs = self._calc_obs()
 
