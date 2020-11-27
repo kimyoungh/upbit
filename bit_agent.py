@@ -107,8 +107,7 @@ class BitAgent:
 
         start = datetime.datetime.now()
 
-        #scheduler = optim.lr_scheduler.StepLR(self.optimizer, 10000.0,
-                                              gamma=0.99)
+        #scheduler = optim.lr_scheduler.StepLR(self.optimizer, 10000.0, gamma=0.99)
 
         mp.set_start_method('spawn', force=True)
         self.investor.share_memory()
