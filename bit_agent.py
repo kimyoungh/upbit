@@ -339,6 +339,7 @@ class BitAgent:
         qs[:, :2] = q_values
         qs[:, 2:] = q_values
         qmax, _ = q_values.max(dim=-1)
+        q_values = qs
 
         _, max_w_indices = weights.max(dim=-1)
         max_q = q_values[np.arange(q_values.shape[0]), max_w_indices]
