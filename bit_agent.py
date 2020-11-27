@@ -35,7 +35,7 @@ class BitAgent:
                  device='cuda:0',
                  model_path='./models/', load_model=False, logdir='./logdir/',
                  process_count=8,
-                 lr=0.01, clip_grad=0.5,
+                 lr=0.001, clip_grad=0.5,
                  train_batch=128, grad_batch=4,
                  reward_gamma=0.9, entropy_beta=0.01):
 
@@ -107,7 +107,7 @@ class BitAgent:
 
         start = datetime.datetime.now()
 
-        scheduler = optim.lr_scheduler.StepLR(self.optimizer, 10000.0,
+        #scheduler = optim.lr_scheduler.StepLR(self.optimizer, 10000.0,
                                               gamma=0.99)
 
         mp.set_start_method('spawn', force=True)
@@ -154,7 +154,7 @@ class BitAgent:
                     nn_utils.clip_grad_norm_(self.investor.parameters(),
                                              self.clip_grad)
                     self.optimizer.step()
-                    scheduler.step()
+                    #scheduler.step()
                     grad_buffer = None
 
                 episode_info = episode_check_queue.get()
