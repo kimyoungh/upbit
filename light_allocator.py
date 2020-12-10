@@ -20,29 +20,30 @@ class BitInvestor(nn.Module):
     """
         Bit Investor
     """
-    def __init__(self, in_channels=6, mlength=60, moutdim=4,
-                 hlength=24, houtdim=4,
-                 dlength=250, doutdim=4):
+    def __init__(self, prsi_dim=32, trsi_dim=8,
+                 pm_dim=8, vol_dim=8, tvol_dim=8,
+                 hidden_dim=4):
         super(BitInvestor, self).__init__()
-        self.in_channels = in_channels
 
-        self.mlength = mlength
-        self.moutdim = moutdim
+        self.prsi_dim = prsi_dim
+        prsi_dim2 = int(prsi_dim / 2)
+        self.trsi_dim = trsi_dim
+        self.pm_dim = pm_dim
+        self.vol_dim = vol_dim
+        self.tvol_dim = tvol_dim
+        self.hidden_dim = hidden_dim
 
-        self.hlength = hlength
-        self.houtdim = houtdim
-
-        self.dlength = dlength
-        self.doutdim = doutdim
-
-        tshape = moutdim + houtdim + doutdim
+        tshape = 5 * hidden_dim
         self.spike = Uniform(0., 1.)
         self.sigmoid = nn.Sigmoid()
         self.relu = nn.ReLU()
 
-        self.mcnn = SequenceCNN(in_channels, mlength, moutdim)
-        self.hcnn = SequenceCNN(in_channels, hlength, houtdim)
-        self.dcnn = SequenceCNN(in_channels, dlength, doutdim)
+        self.prsi_net1 = nn.Linear(prsi_dim, prsi_dim2)
+        self.prsi_net2 = nn.Linear(prsi_dim2, hidden_dim)
+        self.trsi_net = nn.Linear(trsi_dim, hidden_dim)
+        self.pm_net = nn.Linear(pm_dim, hidden_dim)
+        self.vol_net = nn.Linear(vol_dim, hidden_dim)
+        self.tvol_net = nn.Linear(tvol_dim, hidden_dim)
 
         self.wnet = nn.Linear(tshape, 2)
         self.qnet = nn.Linear(tshape, 2)
@@ -75,23 +76,26 @@ class BitInvestor(nn.Module):
 
         return rebal_msk.view(-1)
 
-    def forward(self, minutes, hours, days, weights_prev,
+    def forward(self, prsi, trsi, pm, vol, tvol, weights_prev,
                 init=False, train=False, num=100.):
         if train:
             self.train()
 
-            minutes = self.mcnn(minutes)
-            hours = self.hcnn(hours)
-            days = self.dcnn(days)
+            prsi = self.relu(self.prsi_net1(prsi))
+            prsi = self.relu(self.prsi_net2(prsi))
+            trsi = self.relu(self.trsi_net(trsi))
+            pm = self.relu(self.pm_net(pm))
+            vol = self.relu(self.vol_net(vol))
+            tvol = self.relu(self.tvol_net(tvol))
 
-            bits = torch.cat((minutes, hours, days), dim=1)
+            bits = torch.cat((prsi, trsi, pm, vol, tvol), dim=1)
 
             rebal_msk = self.sel_rebalancing(bits, weights_prev,
                                              train=train, init=init, num=num)
             wscores = self.sigmoid(self.wnet(bits)) * rebal_msk
             q_values = self.qnet(bits)
 
-            if rebal_msk.item() > 0.:
+            if rebal_msk.item() > 0.5:
                 weights = wscores / wscores.sum()
             else:
                 weights = torch.zeros_like(wscores).detach()
@@ -99,18 +103,21 @@ class BitInvestor(nn.Module):
         else:
             self.eval()
             with torch.no_grad():
-                minutes = self.mcnn(minutes)
-                hours = self.hcnn(hours)
-                days = self.dcnn(days)
+                prsi = self.relu(self.prsi_net1(prsi))
+                prsi = self.relu(self.prsi_net2(prsi))
+                trsi = self.relu(self.trsi_net(trsi))
+                pm = self.relu(self.pm_net(pm))
+                vol = self.relu(self.vol_net(vol))
+                tvol = self.relu(self.tvol_net(tvol))
 
-                bits = torch.cat((minutes, hours, days), dim=1)
+                bits = torch.cat((prsi, trsi, pm, vol, tvol), dim=1)
 
                 rebal_msk = self.sel_rebalancing(bits, weights_prev,
                                                  train=train, init=init, num=num)
                 wscores = self.sigmoid(self.wnet(bits)) * rebal_msk
                 q_values = self.qnet(bits)
 
-            if rebal_msk.item() > 0.:
+            if rebal_msk.item() > 0.5:
                 weights = wscores / wscores.sum()
             else:
                 weights = torch.zeros_like(wscores).detach()
@@ -124,46 +131,3 @@ class BitInvestor(nn.Module):
         rweights = torch.cat((nweights, weights), dim=1)
 
         return rweights, wscores, q_values, rebal_msk
-
-class SequenceCNN(nn.Module):
-    """
-        Sequence CNN
-    """
-    def __init__(self, in_channels=7, length=60, output_dim=4):
-        super(SequenceCNN, self).__init__()
-        self.in_channels = in_channels
-        self.length = length
-        self.output_dim = output_dim
-
-        self.conv1 = nn.Conv1d(in_channels, 8, 4, 2)
-        self.conv2 = nn.Conv1d(8, 16, 4, 2)
-        self.conv3 = nn.Conv1d(16, 32, 4, 2)
-
-        self.act = nn.LeakyReLU(0.2)
-
-        self.outdim = self._calc_outshape()
-
-        self.fc1 = nn.Linear(self.outdim * 32, output_dim * 2)
-        self.fc2 = nn.Linear(output_dim * 2, output_dim)
-
-    def _calc_outshape(self):
-        d1 = (self.length - (4 - 1) - 1) / 2 + 1
-        d2 = (d1 - (4 - 1) - 1) / 2 + 1
-        d3 = (d2 - (4 - 1) - 1) / 2 + 1
-
-        return int(d3)
-
-    def forward(self, x):
-        hidden = self.conv1(x)
-        hidden = self.act(hidden)
-        hidden = self.conv2(hidden)
-        hidden = self.act(hidden)
-        hidden = self.conv3(hidden)
-        hidden = self.act(hidden)
-
-        hidden = hidden.view(-1, self.outdim * 32)
-        out = self.fc1(hidden)
-        out = self.act(out)
-        out = self.fc2(out)
-
-        return out

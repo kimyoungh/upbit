@@ -4,6 +4,9 @@
     Created on 2020.11.07
     @author: Younghyun Kim
 """
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
 import pickle
 from copy import deepcopy
 import datetime
@@ -18,25 +21,23 @@ import torch.nn.functional as F
 import torch.multiprocessing as mp
 from tensorboardX import SummaryWriter
 
-from environ import Environment
-from bit_allocator import BitInvestor
+from environ_light import Environment
+from light_allocator import BitInvestor
 
 
 class BitAgent:
     """
         Bit Investor 학습을 위한 Asynchronous RL Agent Class
     """
-    def __init__(self, price_data, in_channels=6,
-                 mlength=60, moutdim=4,
-                 hlength=24, houtdim=4,
-                 dlength=250, doutdim=4,
+    def __init__(self, price_data, prsi_dim=32, trsi_dim=8,
+                 pm_dim=8, vol_dim=8, tvol_dim=8, hidden_dim=4,
                  tlength=1440,
                  buying_fee=0.004, selling_fee=0.004,
                  device='cuda:0',
                  model_path='./models/', load_model=False, logdir='./logdir/',
                  process_count=8,
-                 lr=0.001, clip_grad=0.5,
-                 train_batch=128, grad_batch=4,
+                 lr=0.5, clip_grad=0.5,
+                 train_batch=4, grad_batch=2,
                  reward_gamma=0.9, entropy_beta=0.01):
 
         self.lr = lr
@@ -55,27 +56,26 @@ class BitAgent:
         self.device = device
 
         # manager parameters
-        self.in_channels = in_channels
-        self.mlength = mlength
-        self.moutdim = moutdim
-        self.hlength = hlength
-        self.houtdim = houtdim
-        self.dlength = dlength
-        self.doutdim = doutdim
-        self.tlength = tlength
+        self.prsi_dim = prsi_dim
+        self.trsi_dim = trsi_dim
+        self.pm_dim = pm_dim
+        self.vol_dim = vol_dim
+        self.tvol_dim = tvol_dim
+        self.hidden_dim = hidden_dim
 
         # environ parameters
         self.buying_fee = buying_fee
         self.selling_fee = selling_fee
         self.price_data = price_data
 
+        self.tlength = tlength
+
         # Environment
         self.env = Environment(price_data, tlength, buying_fee, selling_fee)
 
         # Bit Investor
-        self.investor = BitInvestor(in_channels, mlength,
-                                    moutdim, hlength, houtdim,
-                                    dlength, doutdim)
+        self.investor = BitInvestor(prsi_dim, trsi_dim, pm_dim, vol_dim,
+                                    tvol_dim, hidden_dim)
         self.investor = self.investor.to(device)
         self.investor.eval()
 
@@ -107,14 +107,14 @@ class BitAgent:
 
         start = datetime.datetime.now()
 
-        #scheduler = optim.lr_scheduler.StepLR(self.optimizer, 10000.0, gamma=0.99)
+        scheduler = optim.lr_scheduler.StepLR(self.optimizer, 10000.0, gamma=0.99)
 
-        mp.set_start_method('spawn', force=True)
+        mp.set_start_method('spawn')
         self.investor.share_memory()
-
         train_queue = mp.Queue(maxsize=self.process_count)
         episode_check_queue = mp.Queue(maxsize=self.process_count)
         timings_queue = mp.Queue(maxsize=self.process_count)
+        model_queue = mp.Queue(maxsize=self.process_count)
 
         ep_t = 0
         data_proc_list = []
@@ -122,9 +122,11 @@ class BitAgent:
 
         for proc_idx in range(self.process_count):
             timings_queue.put(episodes)
+            model_queue.put(deepcopy(self.investor))
             data_proc = mp.Process(target=self.simulation,
-                                   args=(self.investor, timings_queue,
+                                   args=(timings_queue,
                                          train_queue, episode_check_queue,
+                                         model_queue,
                                          1e-6, iters))
             data_proc.start()
             data_proc_list.append(data_proc)
@@ -138,6 +140,7 @@ class BitAgent:
                     break
 
                 train_entry = train_queue.get()
+
                 step_idx += 1
 
                 if grad_buffer is None:
@@ -153,7 +156,7 @@ class BitAgent:
                     nn_utils.clip_grad_norm_(self.investor.parameters(),
                                              self.clip_grad)
                     self.optimizer.step()
-                    #scheduler.step()
+                    scheduler.step()
                     grad_buffer = None
 
                 episode_info = episode_check_queue.get()
@@ -162,8 +165,8 @@ class BitAgent:
                 episodes -= done
 
                 if len(episode_info) > 1:
-                    timings_queue.put(episodes)
-
+                    timings_queue.put(episodes) 
+                    model_queue.put(deepcopy(self.investor))
                     writer.add_scalar('Reward(Avg)', episode_info[3], ep_t)
                     writer.add_scalar('Cum_Ret', episode_info[4], ep_t)
                     writer.add_scalar('Mu', episode_info[5], ep_t)
@@ -186,8 +189,9 @@ class BitAgent:
         end = datetime.datetime.now()
         print((end - start).total_seconds())
 
-    def simulation(self, investor, timings_queue, train_queue,
-                   episode_check_queue, eps=1e-6, iters=10):
+    def simulation(self, timings_queue, train_queue,
+                   episode_check_queue, model_queue,
+                   eps=1e-6, iters=10):
         """
             비트코인 투자 시뮬레이션
 
@@ -195,18 +199,17 @@ class BitAgent:
                 grads, done, reward, return
         """
         #print("simulation beginning...")
-
+        investor = model_queue.get()
         while True:
 
             env = deepcopy(self.env)
 
             beg_pos = np.random.randint(self.env.min_beg,
-                                        self.env.price_data.shape[0] - \
+                                        self.env.price.shape[0] - \
                                         (self.tlength - 1), 1).item()
 
             for i in range(iters):
                 episodes = timings_queue.get()
-
                 t_pos = 0
 
                 obs, done = env.reset(beg_pos=beg_pos)
@@ -289,9 +292,10 @@ class BitAgent:
                                 ep = 0
                             episode_check_queue.\
                                 put([ep, i,
-                                     env.price_data.index[beg_pos],
+                                     env.price.index[beg_pos],
                                      reward, cum_ret, mu.item(), sig.item(),
                                      ir.detach().item()])
+                            investor = model_queue.get()
 
                     obs = next_obs
 
