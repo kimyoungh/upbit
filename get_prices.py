@@ -1,25 +1,23 @@
 """
     과거 시세 가져오는 스크립트
 """
+import pickle
 import datetime
 import numpy as np
 import pandas as pd
 
-from iqa_common.db_execute_manager import DBExecuteManager
 from quotation import Quotation
 
 time_format = '%Y-%m-%d %H:%M:%S'
 outtime_format = '%Y-%m-%dT%H:%M:%S'
 
-dbm = DBExecuteManager(host='localhost', port=3306)
-col_query = "show columns from quantDB.bitcoin_price"
-cols = dbm.get_fetchall(col_query)
-cols = np.array(cols)[:, 0].ravel()
-post_query = dbm.create_insert_query("quantDB.bitcoin_price", cols)
-
 quo = Quotation()
 
-limit = datetime.datetime(2019, 3, 6, 21, 0)
+pdata = pd.read_csv('bitcoin_price.csv', header=0, index_col=0)
+pdata = pdata.set_index('candle_date_time_utc')
+
+limit = datetime.datetime.strptime(pdata.index[-1], outtime_format)
+limit = limit + datetime.timedelta(minutes=200)
 
 cnt = 0
 
@@ -32,10 +30,15 @@ while True:
     returns = quo.get_market_price(period='minutes', to=limit_str,
                                    count=200)
     returns = returns.applymap(lambda x: 0 if pd.isnull(x) else x)
+    returns = returns.set_index('candle_date_time_utc')
 
-    dbm.set_commit(post_query, returns.values.tolist(), is_many=True)
+    pdata = pdata.append(returns)
+    pdata = pdata[~pdata.index.duplicated(keep='first')]
 
-    end_time = returns['candle_date_time_utc'].iloc[-1]
+    with open('bitcoin_price_recent.pkl', 'wb') as f:
+        pickle.dump(pdata, f)
+
+    end_time = pdata.index[-1]
     end_time = datetime.datetime.strptime(end_time, outtime_format)
 
     end_time = datetime.datetime(end_time.year, end_time.month, end_time.day,
