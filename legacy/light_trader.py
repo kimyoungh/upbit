@@ -23,6 +23,7 @@ MODEL_CONFIG = {
     'trsi_dim': 8,
     'pm_dim': 8,
     'vol_dim': 8,
+    'tvol_dim': 8,
     'hidden_dim': 4,
 }
 
@@ -134,6 +135,7 @@ class BitTrader:
 
     def get_obs(self):
         " calculate observation "
+        self._calc_features()
         prsi = self.prsi.iloc[-1]
         prsi = torch.FloatTensor(prsi.values.astype(float))
         prsi = prsi.unsqueeze(0).to(self.device)
@@ -253,13 +255,18 @@ class BitTrader:
                                tvol_60, tvol_120, tvol_360,
                                tvol_720, tvol_1440), axis=1)
 
-    def trade(self, market='KRW-BTC', down_limit=-0.1):
+    def trade(self, market='KRW-BTC', down_limit=-0.1, eps=10000.0,
+              min_v=1000.0):
         "Trading Method"
         cnt = 0
         data_length = self.price.shape[0]
         uuid = None
         init_nav = None
         nav = None
+
+        info = self.account.get_order_available_info()
+        bid_fee = float(info['bid_fee'])
+        ask_fee = float(info['ask_fee'])
 
         while True:
             self.get_now()
@@ -273,14 +280,42 @@ class BitTrader:
                 volume = res['volume']
 
                 if state == 'done':
-                    self.trading_log.write(kor_now + "\t" +
-                                           state + "\t" + price +
-                                           "\t" + volume + "\n")
+                    print(res)
+                    print(kor_now, state, price, volume)
                 uuid = None
 
             # 최근 데이터가 없는 경우 가져오기
-            if self.price.index[-1] < now:
+            if self.price.index[-1] < now.strftime(self.outtime_format):
                 self.get_price()
+
+            # 직전 체결가 가져와서 현재 순자산 계산
+            res = self.quo.get_recent_traded_data(market=market, count=1,
+                                                  daysAgo=0)
+            rec_price = res[0]['trade_price']
+
+            balance = self.account.checking_account()
+
+            bal_btc = float(balance[0]['balance'])
+            btc_value = rec_price * bal_btc
+            krw_value = float(balance[1]['balance'])
+
+            nav = btc_value + krw_value
+            self.trading_log.write(kor_now + "\t" + "NAV: " +
+                                   str(nav) + "\n")
+
+            # 트레이딩 초기 순자산 저장
+            if cnt == 0:
+                init_nav = nav
+                print(btc_value)
+                print(krw_value)
+                print(nav)
+
+            cumreturn = (nav / init_nav) - 1.
+            if cumreturn <= down_limit:
+                self.trading_log.write("Downside_limit_over " +
+                                       kor_now + "\t" +
+                                       str(cumreturn) + "\n")
+                break
 
             # 데이터 업데이트가 된 경우에만 트레이딩
             if data_length < self.price.shape[0]:
@@ -289,66 +324,58 @@ class BitTrader:
                 # 최근 주문 내역 취소
                 self.check_and_cancel_order_uuid()
 
-                # 직전 체결가 가져와서 현재 순자산 계산
-                res = self.quo.get_recent_traded_data(market=market, count=1,
-                                                      daysAgo=0)
-                rec_price = res[0]['trade_price']
-
-                balance = self.account.checking_account()
-
-                bal_btc = float(balance[0]['balance'])
-                btc_value = rec_price * bal_btc
-                krw_value = float(balance[1]['balance'])
-
-                nav = btc_value + krw_value
-                self.trading_log.write(kor_now + "\t" + "NAV: " +
-                                       str(nav) + "\n")
-
-                cumreturn = (nav / init_nav) - 1.
-                if cumreturn <= down_limit:
-                    self.trading_log.write("Downside_limit_over " +
-                                           kor_now + "\t" +
-                                           str(cumreturn) + "\n")
-                    break
-
                 btc_prob = btc_value / nav
                 krw_prob = krw_value / nav
 
-                # 트레이딩 초기 순자산 저장
-                if cnt == 0:
-                    init_nav = nav
-
                 # 최신 투자비중
-                weights_rec = torch.FloatTensor([btc_prob,
-                                                 krw_prob]).to(self.device)
+                weights_rec = torch.FloatTensor([[btc_prob,
+                                                  krw_prob]]).to(self.device)
                 obs = self.get_obs()
 
                 # 리밸런싱 의사결정
                 rweights, _, _, rebal = self.trader(*obs, weights_rec,
                                                     train=False, init=False)
 
-                if rebal:
+                rebal = rebal.item()
+                print(rebal)
+                if rebal == 1.:
+                    print("weights_rec: ", weights_rec)
+                    print("rweights: ", rweights)
                     btc_w = rweights[0, -2].item()
                     btc_diff = btc_w - btc_prob
 
                     if btc_diff == 0.:
                         continue
 
-                    btc_trading_bal = nav * btc_diff / rec_price
+                    if btc_diff > 0:
+                        tnav = nav * (1. - bid_fee) - eps
+                    else:
+                        tnav = nav * (1. - ask_fee) - eps
+                    btc_trading_bal = tnav * btc_diff / rec_price
 
                     if btc_trading_bal > 0:
                         side = 'bid'
                         ord_type = 'price'
+                        b_price = rec_price
                     else:
                         side = 'ask'
                         ord_type = 'market'
+                        b_price = None
 
                     btc_trading_bal = abs(btc_trading_bal)
 
-                    # 주문하기
-                    res = self.account.order(side, btc_trading_bal,
-                                             rec_price, ord_type,
-                                             market=market)
-                    uuid = res['uuid']
+                    if btc_trading_bal * rec_price >= min_v:
+                        # 주문하기
+                        res = self.account.order(side, btc_trading_bal,
+                                                 b_price, ord_type,
+                                                 market=market)
+                        print(side)
+                        print(res)
+                        uuid = res['uuid']
 
             cnt += 1
+
+if __name__ == "__main__":
+    trader = BitTrader(device='cpu')
+
+    trader.trade()

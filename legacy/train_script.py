@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 from bit_agent import BitAgent
 
@@ -9,3 +10,5 @@ trainer = BitAgent(price_data, model_path='./models/v1.pt',
 
 
 trainer.train(2000000)
+
+print(np.arange(20))

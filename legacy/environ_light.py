@@ -188,13 +188,15 @@ class Environment:
             weights = acts[0, :2]
 
         if ret > 0 and weights[0] >= weights[1]:
-            reward = 1.
+            reward = ret * weights[0]
         elif ret > 0 and weights[0] < weights[1]:
-            reward = -1.
+            reward = -ret * weights[0]
         elif ret <= 0 and weights[0] >= weights[1]:
-            reward = -1.
+            reward = ret * weights[0]
         elif ret <= 0 and weights[0] < weights[1]:
-            reward = 1.
+            reward = -ret * weights[0]
+        else:
+            reward = 0.
 
         next_obs = self._calc_obs()
 
