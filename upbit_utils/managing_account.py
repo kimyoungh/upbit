@@ -189,8 +189,8 @@ class AccountManager:
         query = {
             'market': market,
             'side': side,
-            'volume': str(volume),
-            'price': str(price),
+            'volume': str(volume) if volume is not None else '',
+            'price': str(price) if price is not None else '',
             'ord_type': ord_type,
         }
         query_string = urlencode(query).encode()
