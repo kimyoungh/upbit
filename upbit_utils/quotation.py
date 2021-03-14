@@ -83,7 +83,8 @@ class Quotation:
 
         return returns
 
-    def get_recent_traded_data(self, to=None, market='KRW-BTC', count=1, daysAgo=1):
+    def get_recent_traded_data(self, to=None, market='KRW-BTC',
+                               count=1, daysAgo=1):
         """
             최근 체결 내역
 
@@ -108,7 +109,7 @@ class Quotation:
             현재가 정보
         """
         url = self.url + "/v1/ticker"
-        query = {'market': market}
+        query = {'markets': market}
 
         res = requests.request('GET', url, params=query)
 
