@@ -38,11 +38,17 @@ class RealtimeProcessor:
 
         self.quo = Quotation()
 
-        self.dbm = DBExecuteManager(host=config['host'],
-                                    port=config['port'],
-                                    user=config['user'],
-                                    passwd=config['passwd'],
-                                    db=config['db'])
+        self.dbm_1 = DBExecuteManager(host=config['host'],
+                                      port=config['port'],
+                                      user=config['user'],
+                                      passwd=config['passwd'],
+                                      db=config['db'])
+
+        self.dbm_2 = DBExecuteManager(host=config['host'],
+                                      port=config['port'],
+                                      user=config['user'],
+                                      passwd=config['passwd'],
+                                      db=config['db'])
 
         self._get_rec_price_columns()
         self._get_orderbooks_columns()
@@ -76,7 +82,7 @@ class RealtimeProcessor:
             applymap(lambda x: x / 1000.)
 
         rec_list = rec_price.values.tolist()
-        self.dbm.set_commit(self.price_query, rec_list,
+        self.dbm_1.set_commit(self.price_query, rec_list,
                             is_many=True)
 
     def processing_orderbooks(self):
@@ -100,21 +106,21 @@ class RealtimeProcessor:
                     for units in value:
                         for _, uvalue in units.items():
                             order_list.append(uvalue)
-            self.dbm.set_commit(self.order_query, [order_list],
+            self.dbm_2.set_commit(self.order_query, [order_list],
                                 is_many=True)
 
     def _create_rec_price_insert_query(self):
         table_name = 'quantdb.crypto_recent_price'
 
         self.price_query =\
-            self.dbm.create_insert_query(table_name,
+            self.dbm_1.create_insert_query(table_name,
                                          self.rec_price_cols)
 
     def _create_orderbooks_insert_query(self):
         table_name = 'quantdb.crypto_orderbooks'
 
         self.order_query =\
-            self.dbm.create_insert_query(table_name,
+            self.dbm_2.create_insert_query(table_name,
                                          self.orderbooks_cols)
 
     def _get_rec_price_columns(self):
@@ -124,7 +130,7 @@ class RealtimeProcessor:
                         columns
                     from quantdb.crypto_recent_price
                 """
-        res = self.dbm.get_fetchall(query)
+        res = self.dbm_1.get_fetchall(query)
         res = pd.DataFrame(res).values[:, 0].ravel()
 
         self.rec_price_cols = res
@@ -136,7 +142,7 @@ class RealtimeProcessor:
                         columns
                     from quantdb.crypto_orderbooks
                 """
-        res = self.dbm.get_fetchall(query)
+        res = self.dbm_2.get_fetchall(query)
         res = pd.DataFrame(res).values[:, 0].ravel()
 
         self.orderbooks_cols = res
