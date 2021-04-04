@@ -17,18 +17,19 @@ env_config = {
                 'recent': None,
                 'fee': 0.005,
                 'min_episode_length': 200000,
+                'window': 100,
                 'ask_price_cols': np.array(
                         ['ask_price_'+str(i)
-                            for i in np.arange(1, 15)]),
+                            for i in np.arange(1, 16)]),
                 'ask_size_cols': np.array(
                         ['ask_size_'+str(i)
-                            for i in np.arange(1, 15)]),
+                            for i in np.arange(1, 16)]),
                 'bid_price_cols': np.array(
                         ['bid_price_'+str(i)
-                            for i in np.arange(1, 15)]),
+                            for i in np.arange(1, 16)]),
                 'bid_size_cols': np.array(
                         ['bid_size_'+str(i)
-                            for i in np.arange(1, 15)]),
+                            for i in np.arange(1, 16)]),
              }
 
 
@@ -54,53 +55,127 @@ class Environ(gym.Env):
 
         self.min_episode_length =\
             env_config['min_episode_length']
+        self.window = env_config['window']
 
         self.epi_index = None
         self.cur_pos = None
+        self.end_pos = None
+
+        self.orderbook = None
+        self.total_bid_ask = None
+        self.trade_price = None
+        self.asset = 1.
+        self.possession = False
 
     def reset(self, min_episode_length=None):
-        start_pos = np.random.choice(np.arange(self.index.shape[0]),
-                                     1,
-                                     replace=False).item()
         """
             Reset episodes
             Args:
                 min_episode_length(default: self.min_episode_length)
 
             Return:
-                obs: ask_price, ask_size, bid_price,
-                     bid_size, total_ask_size, total_bid_size,
-                     trade_price
+                obs: orderbook, total_bid_ask, trade_price
+                     * trade_price: 한 시점 씩 앞당겨짐
         """
         if min_episode_length is None:
             min_epi = self.min_episode_length
-            end_t = np.random.choice(
-                    self.index[start_pos + min_epi:],
-                    1, replace=False).item()
         else:
-            end_t = np.random.choice(
-                    self.index[start_pos + min_episode_length-1:],
-                    1, replace=False).item()
+            min_epi = min_episode_length
+
+        start_pos = np.random.choice(np.arange(self.window - 1,
+                                               self.index.shape[0] -
+                                               min_epi + 1),
+                                     1, replace=False).item()
+
+        end_t = self.index[start_pos + min_epi]
+
         end_pos = np.argwhere(self.index == end_t).item()
 
         self.epi_index = self.index[start_pos:end_pos+1]
-        self.cur_pos = 0
+        self.cur_pos = self.window - 1
+        self.end_pos = self.epi_index.shape[0] - 1
 
-        observ = self.observ.loc[self.epi_index[self.cur_pos]]
-        ask_price = observ[self.ask_price_cols].values
-        ask_size = observ[self.ask_size_cols].values
+        orderbook, total_bid_ask, trade_price =\
+            self.calc_obs() 
+
+        self.asset = 1.
+        self.possession = False
+
+        return [orderbook, total_bid_ask, trade_price]
+
+    def step(self, action, mul=100., neg=-1.,
+             rmin=-1., rmax=+1.):
+        """
+            action: [0: sell, 1: hold, 2: buy]
+        """
+        self.cur_pos += 1
+        if self.cur_pos == self.end_pos:
+            done = True
+        else:
+            done = False
+
+        orderbook, total_bid_ask, trade_price =\
+            self.calc_obs()
+
+        ret = trade_price[-1] / trade_price[-2] - 1.
+
+        if self.possession:
+            self.asset *= (1. + ret)
+
+        if action == 0:
+            if self.possession:
+                cum_ret = -ret
+                cum_ret -= self.fee
+                reward = cum_ret * mul
+
+                self.asset -= self.fee
+
+                self.possession = False
+            else:
+                reward = neg
+        elif action == 1:
+            if self.possession:
+                reward = ret * mul
+            else:
+                reward = -ret * mul
+        elif action == 2:
+            if not self.possession:
+                cum_ret = ret - self.fee
+                reward = cum_ret * mul
+
+                self.possession = True
+                self.asset *= (1. + cum_ret)
+            else:
+                reward = neg
+
+        reward = np.clip(reward, rmin, rmax)
+
+        return [orderbook, total_bid_ask, trade_price],\
+            reward, done
+
+    def calc_obs(self):
+        " calc observation "
+        observ = self.observ.loc[
+                self.epi_index[
+                    self.cur_pos-(self.window-1):self.cur_pos+1]]
+        ask_price = observ[self.ask_price_cols].values[:, ::-1]
+        ask_size = observ[self.ask_size_cols].values[:, ::-1]
         bid_price = observ[self.bid_price_cols].values
         bid_size = observ[self.bid_size_cols].values
-        total_ask_size = observ['total_ask_size']
-        total_bid_size = observ['total_bid_size']
-        trade_price = observ['trade_price']
+        total_ask_size = observ['total_ask_size'].values
+        total_bid_size = observ['total_bid_size'].values
+        trade_price = observ['trade_price'].values
 
-        return [ask_price, ask_size, bid_price,
-                bid_size, total_ask_size, total_bid_size,
-                trade_price]
+        price = np.concatenate((ask_price, bid_price), axis=1)
+        size = np.concatenate((ask_size, bid_size), axis=1)
 
-    def step(self, action):
-        pass
+        orderbook =\
+            np.hstack((price, size)).reshape(self.window, 2, -1)
+
+        total_bid_ask =\
+            np.vstack((total_bid_size, total_ask_size)).transpose()
+
+        return orderbook, total_bid_ask, trade_price
 
 
 class DataLoader:
