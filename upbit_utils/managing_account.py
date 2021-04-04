@@ -27,7 +27,7 @@ class AccountManager:
             'nonce': str(uuid.uuid4()),
             }
 
-        jwt_token = jwt.encode(payload, self.secret_key).decode('utf-8')
+        jwt_token = jwt.encode(payload, self.secret_key)
         authorize_token = 'Bearer {}'.format(jwt_token)
         headers = {'Authorization': authorize_token}
 
@@ -56,7 +56,7 @@ class AccountManager:
 
         payload = self._get_payload(query_hash, 'SHA512')
 
-        jwt_token = jwt.encode(payload, self.secret_key).decode('utf-8')
+        jwt_token = jwt.encode(payload, self.secret_key)
         authorize_token = 'Bearer {}'.format(jwt_token)
         headers = {"Authorization": authorize_token}
 
@@ -85,7 +85,7 @@ class AccountManager:
 
         payload = self._get_payload(query_hash, 'SHA512')
 
-        jwt_token = jwt.encode(payload, self.secret_key).decode('utf-8')
+        jwt_token = jwt.encode(payload, self.secret_key)
         authorize_token = 'Bearer {}'.format(jwt_token)
         headers = {"Authorization": authorize_token}
 
@@ -133,7 +133,7 @@ class AccountManager:
 
         payload = self._get_payload(query_hash, 'SHA512')
 
-        jwt_token = jwt.encode(payload, self.secret_key).decode('utf-8')
+        jwt_token = jwt.encode(payload, self.secret_key)
         authorize_token = 'Bearer {}'.format(jwt_token)
         headers = {'Authorization': authorize_token}
 
@@ -162,7 +162,7 @@ class AccountManager:
 
         payload = self._get_payload(query_hash, 'SHA512')
 
-        jwt_token = jwt.encode(payload, self.secret_key).decode('utf-8')
+        jwt_token = jwt.encode(payload, self.secret_key)
         authorize_token = 'Bearer {}'.format(jwt_token)
         headers = {'Authorization': authorize_token}
 
@@ -201,7 +201,7 @@ class AccountManager:
 
         payload = self._get_payload(query_hash, 'SHA512')
 
-        jwt_token = jwt.encode(payload, self.secret_key).decode('utf-8')
+        jwt_token = jwt.encode(payload, self.secret_key)
         authorize_token = 'Bearer {}'.format(jwt_token)
         headers = {'Authorization': authorize_token}
 
