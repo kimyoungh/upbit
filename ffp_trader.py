@@ -35,14 +35,13 @@ class FFPTrader(nn.Module):
         self.dropout = dropout
 
         self.gelu = nn.GELU()
-        self.relu = nn.ReLU()
 
         self.order_conv = nn.Sequential(
-                            nn.Conv2d(channel, 4, 4, 1),
+                            nn.Conv1d(channel, 4, 4, 1),
                             nn.GELU(),
-                            nn.Conv2d(4, 8, 4, 1),
+                            nn.Conv1d(4, 8, 4, 1),
                             nn.GELU(),
-                            nn.Conv2d(8, 16, 2, 1),
+                            nn.Conv1d(8, 16, 2, 1),
                             nn.GELU())
 
         self.bidask_fc = nn.Sequential(
@@ -55,7 +54,10 @@ class FFPTrader(nn.Module):
 
         with torch.no_grad():
             x = torch.randn(1, channel, order_dim)
+            x = self.order_conv(x)
             x_dim = self.num_flat_features(x)
+
+        self.x_dim = x_dim
 
         self.emb_net = nn.Linear(x_dim + 1 + 1, emb_dim)
         self.attn = Transformer(emb_dim, nheads, dropout)
@@ -74,19 +76,26 @@ class FFPTrader(nn.Module):
         )
 
     def num_flat_features(self, x):
-        size = x.size()[2:]
+        size = x.size()[1:]
         num_features = 1
         for s in size:
             num_features *= s
         return num_features
 
     def forward(self, orderbook, total_bid_ask, trade_price):
-        orders = self.order_conv(orderbook)
+        orders =\
+            torch.zeros(orderbook.shape[0],
+                        orderbook.shape[1], self.x_dim).to(orderbook.device)
+
+        for i in range(orders.shape[0]):
+            for j in range(orders.shape[1]):
+                orders[i, j] = self.order_conv(orderbook[i, j].unsqueeze(0)).\
+                        view(-1, 1, self.x_dim)
         bidask = self.bidask_fc(total_bid_ask)
         price = self.price_fc(trade_price)
 
         embs = torch.cat((orders, bidask, price), dim=-1)
-        embs = self.GELU(self.emb_net(embs))
+        embs = self.gelu(self.emb_net(embs))
         embs = self.pos_enc(embs)
 
         attn = self.attn(embs)
