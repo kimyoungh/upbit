@@ -103,11 +103,11 @@ class Transformer(nn.Module):
         super(Transformer, self).__init__()
         self.emb_dim = emb_dim
         self.nheads = nheads
-        self.dim_feedforward = int(asset_dim * 2)
+        self.dim_feedforward = int(emb_dim * 2)
         self.dropout = dropout
 
         self.encoder =\
-            nn.TransformerEncoderLayer(asset_dim, nheads,
+            nn.TransformerEncoderLayer(emb_dim, nheads,
                                        dim_feedforward=self.dim_feedforward,
                                        dropout=dropout)
 
