@@ -59,7 +59,7 @@ class FFPTrader(nn.Module):
 
         self.x_dim = x_dim
 
-        self.emb_net = nn.Linear(x_dim + 1 + 1, emb_dim)
+        self.emb_net = nn.Linear(x_dim + 1 + 1 + 1, emb_dim)
         self.attn = Transformer(emb_dim, nheads, dropout)
         self.pos_enc = PositionalEncoding(emb_dim, dropout)
 
@@ -82,7 +82,8 @@ class FFPTrader(nn.Module):
             num_features *= s
         return num_features
 
-    def forward(self, orderbook, total_bid_ask, trade_price):
+    def forward(self, orderbook, total_bid_ask,
+                trade_price, possession_series):
         orders =\
             torch.zeros(orderbook.shape[0],
                         orderbook.shape[1], self.x_dim).to(orderbook.device)
@@ -94,7 +95,8 @@ class FFPTrader(nn.Module):
         bidask = self.bidask_fc(total_bid_ask)
         price = self.price_fc(trade_price)
 
-        embs = torch.cat((orders, bidask, price), dim=-1)
+        embs = torch.cat((orders, bidask,
+                          price, possession_series), dim=-1)
         embs = self.gelu(self.emb_net(embs))
         embs = self.pos_enc(embs)
 
