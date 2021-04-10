@@ -35,6 +35,7 @@ class FFPTrader(nn.Module):
         self.dropout = dropout
 
         self.gelu = nn.GELU()
+        self.softplus = nn.Softplus()
 
         self.order_conv = nn.Sequential(
                             nn.Conv1d(channel, 4, 4, 1),
@@ -63,7 +64,13 @@ class FFPTrader(nn.Module):
         self.attn = Transformer(emb_dim, nheads, dropout)
         self.pos_enc = PositionalEncoding(emb_dim, dropout)
 
-        self.policy = nn.Sequential(
+        self.policy_mu = nn.Sequential(
+                nn.Linear(emb_dim, 4),
+                nn.GELU(),
+                nn.Linear(4, action_dim)
+        )
+
+        self.policy_sig = nn.Sequential(
                 nn.Linear(emb_dim, 4),
                 nn.GELU(),
                 nn.Linear(4, action_dim)
@@ -103,7 +110,10 @@ class FFPTrader(nn.Module):
         attn = self.attn(embs)
         attn = attn.mean(1)
 
-        return self.policy(attn), self.value(attn)
+        policy_mu = self.policy_mu(attn)
+        policy_sig = self.softplus(self.policy_sig(attn))
+
+        return policy_mu, policy_sig, self.value(attn)
 
 
 class Transformer(nn.Module):
