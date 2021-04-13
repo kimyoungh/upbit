@@ -36,7 +36,7 @@ class Quotation:
 
         res = requests.request("GET", url, params=querystring)
 
-        return res.text
+        return res.json()
 
     def get_market_price(self, period, to=None, unit=1,
                          market='KRW-BTC', count=1):

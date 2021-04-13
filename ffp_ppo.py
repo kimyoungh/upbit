@@ -5,6 +5,7 @@
     @author: Younghyun Kim
 """
 import os
+from copy import deepcopy
 import math
 import argparse
 import numpy as np
@@ -27,6 +28,10 @@ TRAINER_CONFIG = {
             'ppo_batch_size': 64,
             'test_iters': 1000,
             'device': 'cuda:0',
+            'model_path': './models/',
+            'model_name': 'FFPTrader',
+            'load_model_path': None,
+            'load_model': False,
          }
 
 
@@ -49,11 +54,32 @@ class FFPTPPOTrainer:
         self.ppo_batch_size = config['ppo_batch_size']
         self.test_iters = config['test_iters']
         self.device = config['device']
+        self.model_path = config['model_path']
+        self.model_name = config['model_name']
+        self.load_model_path = config['load_model_path']
+        self.load_model = config['load_model']
 
         self.trader = self.trader.to(self.device)
 
+        if self.load_model:
+            self.load_trader(self.load_model_path)
+
         self.opt = optim.Adam(self.trader.parameters(),
                               lr=self.lr)
+
+    def save_trader(self, path):
+        """
+            학습 모델 저장
+        """
+        torch.save(self.trader.state_dict(), path)
+
+    def load_trader(self, path):
+        """
+            학습된 모델 가져오기
+        """
+        self.trader.load_state_dict(
+                torch.load(path, map_location=self.device))
+        self.trader.eval()
 
     @staticmethod
     def calc_logprob(mu_v, logstd_v, actions_v, cmin=1e-3):
@@ -102,10 +128,21 @@ class FFPTPPOTrainer:
 
         return adv_v, ref_v
 
-    def train(self, episodes=20000):
+    def train(self, episodes=20000, seed=0):
         """
             Train PPO
 
             Args:
                 episodes: # of episodes
         """
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+
+        test_env = deepcopy(self.env)
+        writer = SummaryWriter(
+                comment='-ffptrader-ppo_'+self.model_name)
+
+        self.trader.train()
+
+        trajectory = []
+        best_reward = None
