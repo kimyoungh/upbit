@@ -46,10 +46,15 @@ class FFPTrader(nn.Module):
                             nn.GELU())
 
         self.bidask_fc = nn.Sequential(
+                            nn.Linear(total_bidask_dim,
+                                      total_bidask_dim),
+                            nn.GELU(),
                             nn.Linear(total_bidask_dim, 1),
                             nn.GELU())
 
         self.price_fc = nn.Sequential(
+                            nn.Linear(price_dim, price_dim),
+                            nn.GELU(),
                             nn.Linear(price_dim, 1),
                             nn.GELU())
 
@@ -65,18 +70,26 @@ class FFPTrader(nn.Module):
         self.pos_enc = PositionalEncoding(emb_dim, dropout)
 
         self.policy_mu = nn.Sequential(
+                nn.Linear(emb_dim, emb_dim),
+                nn.GELU(),
+                nn.Linear(emb_dim, emb_dim),
+                nn.GELU(),
+                nn.Linear(emb_dim, emb_dim),
+                nn.GELU(),
                 nn.Linear(emb_dim, 4),
                 nn.GELU(),
                 nn.Linear(4, action_dim)
         )
 
-        self.policy_sig = nn.Sequential(
-                nn.Linear(emb_dim, 4),
-                nn.GELU(),
-                nn.Linear(4, action_dim)
-        )
+        self.policy_logstd = nn.Parameter(torch.zeros(action_dim))
 
         self.value = nn.Sequential(
+                nn.Linear(emb_dim, emb_dim),
+                nn.GELU(),
+                nn.Linear(emb_dim, emb_dim),
+                nn.GELU(),
+                nn.Linear(emb_dim, emb_dim),
+                nn.GELU(),
                 nn.Linear(emb_dim, 4),
                 nn.GELU(),
                 nn.Linear(4, 1)
@@ -100,10 +113,14 @@ class FFPTrader(nn.Module):
                 orders[i, j] = self.order_conv(orderbook[i, j].unsqueeze(0)).\
                         view(-1, 1, self.x_dim)
         bidask = self.bidask_fc(total_bid_ask)
-        price = self.price_fc(trade_price)
+        price =\
+            self.price_fc(trade_price.view(orders.shape[0],
+                                           -1, 1))
 
         embs = torch.cat((orders, bidask,
-                          price, possession_series), dim=-1)
+                          price,
+                          possession_series.view(orders.shape[0],
+                                                 -1, 1)), dim=-1)
         embs = self.gelu(self.emb_net(embs))
         embs = self.pos_enc(embs)
 
@@ -111,9 +128,8 @@ class FFPTrader(nn.Module):
         attn = attn.mean(1)
 
         policy_mu = self.policy_mu(attn)
-        policy_sig = self.softplus(self.policy_sig(attn))
 
-        return policy_mu, policy_sig, self.value(attn)
+        return policy_mu, self.value(attn)
 
 
 class Transformer(nn.Module):

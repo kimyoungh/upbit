@@ -16,7 +16,7 @@ env_config = {
                 'orderbooks': None,
                 'recent': None,
                 'fee': 0.005,
-                'min_episode_length': 200000,
+                'min_episode_length': 20000,
                 'window': 100,
                 'ask_price_cols': np.array(
                         ['ask_price_'+str(i)
@@ -30,12 +30,13 @@ env_config = {
                 'bid_size_cols': np.array(
                         ['bid_size_'+str(i)
                             for i in np.arange(1, 16)]),
+                'downside_limit': -0.05,
              }
 
 
 class Environ(gym.Env):
     " Environ for bitcoin trading "
-    def __init__(self, config):
+    def __init__(self, config=env_config):
         self.config = config
 
         observ = pd.concat((config['orderbooks'],
@@ -54,8 +55,10 @@ class Environ(gym.Env):
         self.fee = config['fee']
 
         self.min_episode_length =\
-            env_config['min_episode_length']
-        self.window = env_config['window']
+            config['min_episode_length']
+        self.window = config['window']
+
+        self.downside_limit = config['downside_limit']  # 손실 허용 범위
 
         self.epi_index = None
         self.cur_pos = None
@@ -66,6 +69,7 @@ class Environ(gym.Env):
         self.trade_price = None
         self.asset = 1.
         self.possession = False
+        self.possession_series = np.zeros(self.window)
 
     def reset(self, min_episode_length=None):
         """
@@ -74,7 +78,8 @@ class Environ(gym.Env):
                 min_episode_length(default: self.min_episode_length)
 
             Return:
-                obs: orderbook, total_bid_ask, trade_price
+                obs: orderbook, total_bid_ask,
+                     trade_price, possession_series
                      * trade_price: 한 시점 씩 앞당겨짐
         """
         if min_episode_length is None:
@@ -95,13 +100,23 @@ class Environ(gym.Env):
         self.cur_pos = self.window - 1
         self.end_pos = self.epi_index.shape[0] - 1
 
-        orderbook, total_bid_ask, trade_price =\
-            self.calc_obs() 
-
-        self.asset = 1.
         self.possession = False
 
-        return [orderbook, total_bid_ask, trade_price]
+        orderbook, total_bid_ask, trade_price, possession_series =\
+            self.calc_obs()
+
+        # Normalize
+        orderbook[0][:, 0] =\
+            self.normalize_series(orderbook[0][:, 0])
+        orderbook[0][:, 1] =\
+            self.normalize_series(orderbook[0][:, 1])
+        total_bid_ask = self.normalize_series(total_bid_ask)
+        trade_price = self.normalize_series(trade_price)
+
+        self.asset = 1.
+
+        return [orderbook, total_bid_ask,
+                trade_price, possession_series]
 
     def step(self, action, mul=100., neg=-1.,
              rmin=-1., rmax=+1.):
@@ -109,18 +124,20 @@ class Environ(gym.Env):
             action: [0: sell, 1: hold, 2: buy]
         """
         self.cur_pos += 1
-        if self.cur_pos == self.end_pos:
-            done = True
-        else:
-            done = False
 
-        orderbook, total_bid_ask, trade_price =\
+        orderbook, total_bid_ask, trade_price, possession_series =\
             self.calc_obs()
 
         ret = trade_price[-1] / trade_price[-2] - 1.
 
         if self.possession:
             self.asset *= (1. + ret)
+
+        if self.cur_pos == self.end_pos or\
+           self.asset <= (1. - self.downside_limit):
+            done = True
+        else:
+            done = False
 
         if action == 0:
             if self.possession:
@@ -150,7 +167,16 @@ class Environ(gym.Env):
 
         reward = np.clip(reward, rmin, rmax)
 
-        return [orderbook, total_bid_ask, trade_price],\
+        # Normalize
+        orderbook[0][:, 0] =\
+            self.normalize_series(orderbook[0][:, 0])
+        orderbook[0][:, 1] =\
+            self.normalize_series(orderbook[0][:, 1])
+        total_bid_ask = self.normalize_series(total_bid_ask)
+        trade_price = self.normalize_series(trade_price)
+
+        return [orderbook, total_bid_ask,
+                trade_price, possession_series],\
             reward, done
 
     def calc_obs(self):
@@ -173,9 +199,26 @@ class Environ(gym.Env):
             np.hstack((price, size)).reshape(self.window, 2, -1)
 
         total_bid_ask =\
-            np.vstack((total_bid_size, total_ask_size)).transpose()
+            np.vstack((total_ask_size, total_bid_size)).transpose()
 
-        return orderbook, total_bid_ask, trade_price
+        self.possession_series[:-1] = self.possession_series[1:]
+        self.possession_series[-1] = float(self.possession)
+
+        return orderbook, total_bid_ask,\
+            trade_price, self.possession_series
+
+    @staticmethod
+    def normalize_series(series):
+        """ normalize series data """
+        smax = series.max()
+        smin = series.min()
+
+        if smax == smin:
+            normalized = np.zeros_like(series)
+        else:
+            normalized = (series - smin) / (smax - smin)
+
+        return normalized
 
 
 class DataLoader:
