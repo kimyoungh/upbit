@@ -298,6 +298,7 @@ class FFPTPPOTrainer:
                                   sum_loss_value / count_steps,
                                   step_idx)
                 step_idx += 1
+                self.save_trader(self.model_path+self.model_name+".pt")
 
     @staticmethod
     def get_action(policy_probs, policy_logstd):
