@@ -33,6 +33,7 @@ TRAINER_CONFIG = {
             'model_name': 'FFPTrader',
             'load_model_path': None,
             'load_model': False,
+            'logdir': './logdir/',
          }
 
 
@@ -59,6 +60,7 @@ class FFPTPPOTrainer:
         self.model_name = config['model_name']
         self.load_model_path = config['load_model_path']
         self.load_model = config['load_model']
+        self.logdir = config['logdir']
 
         self.trader = self.trader.to(self.device)
 
@@ -142,8 +144,7 @@ class FFPTPPOTrainer:
         torch.manual_seed(seed)
         np.random.seed(seed)
 
-        writer = SummaryWriter(
-                comment='-ffptrader-ppo_'+self.model_name)
+        writer = SummaryWriter(self.logdir)
 
         self.trader.train()
 
